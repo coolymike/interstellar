@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [android, linux, windows]
+        target: [android, linux_x86_64, windows, linux_aarch64]
         include:
           - os: ubuntu-latest
             target: android
@@ -46,13 +46,17 @@ jobs:
             build_flags: --split-per-abi
             build_path: build/app/outputs/flutter-apk
           - os: ubuntu-latest
-            target: linux
+            target: linux_x86_64
             build_target: linux
             build_path: build/linux/x64/release/bundle
           - os: windows-latest
             target: windows
             build_target: windows
             build_path: build\windows\x64\runner\Release
+          - os: ubuntu-24.04-arm
+            target: linux_aarch64
+            build_target: linux
+            build_path: build/linux/aarch64/release/bundle
     steps:
       - name: Install android dependencies
         if: matrix.target == 'android'
@@ -61,12 +65,21 @@ jobs:
           java-version: '21'
           distribution: temurin
 
-      - name: Install linux dependencies
-        if: matrix.target == 'linux'
+      - name: Install linux x86_64 dependencies
+        if: matrix.target == 'linux_x86_64'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libx11-dev pkg-config cmake ninja-build libblkid-dev libmpv-dev mpv libfuse2
           wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          mv appimagetool /usr/local/bin/
+
+      - name: Install linux aarch64 dependencies
+        if: matrix.target == 'linux_aarch64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libx11-dev pkg-config cmake ninja-build libblkid-dev libmpv-dev mpv libfuse2
+          wget -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage"
           chmod +x appimagetool
           mv appimagetool /usr/local/bin/
 
@@ -124,18 +137,31 @@ jobs:
           mv $GITHUB_WORKSPACE/build/app/outputs/bundle/release/app-release.aab $GITHUB_WORKSPACE/dist/interstellar-android-googleplay.aab
         working-directory: ${{ matrix.build_path }}
 
-      - name: Build tar.gz for linux
-        if: matrix.target == 'linux'
+      - name: Build tar.gz for linux x86_64
+        if: matrix.target == 'linux_x86_64'
         run: tar -czf $GITHUB_WORKSPACE/dist/interstellar-linux-x86_64.tar.gz *
         working-directory: ${{ matrix.build_path }}
 
-      - name: Build AppImage for linux
-        if: matrix.target == 'linux'
+      - name: Build tar.gz for linux aarch64
+        if: matrix.target == 'linux_aarch64'
+        run: tar -czf $GITHUB_WORKSPACE/dist/interstellar-linux-aarch64.tar.gz *
+        working-directory: ${{ matrix.build_path }}
+
+      - name: Build AppImage for linux x86_64
+        if: matrix.target == 'linux_x86_64'
         run: |
           mv ${{ matrix.build_path }}/* linux/appimage/
           cp assets/icons/logo.png linux/appimage/interstellar.png
           cp $(echo $(ldd -d linux/appimage/interstellar | grep -Eo ' (/usr)?/lib/[^ ]*') $(ldd -d linux/appimage/lib/libflutter_linux_gtk.so | grep -Eo ' (/usr)?/lib/[^ ]*')  | tr ' ' '\n' | sort | uniq -u) linux/appimage/lib/
           appimagetool linux/appimage dist/interstellar-linux-x86_64.AppImage
+
+      - name: Build AppImage for linux aarch64
+        if: matrix.target == 'linux_aarch64'
+        run: |
+          mv ${{ matrix.build_path }}/* linux/appimage/
+          cp assets/icons/logo.png linux/appimage/interstellar.png
+          cp $(echo $(ldd -d linux/appimage/interstellar | grep -Eo ' (/usr)?/lib/[^ ]*') $(ldd -d linux/appimage/lib/libflutter_linux_gtk.so | grep -Eo ' (/usr)?/lib/[^ ]*')  | tr ' ' '\n' | sort | uniq -u) linux/appimage/lib/
+          appimagetool linux/appimage dist/interstellar-linux-aarch64.AppImage
 
       - name: Compress build for Windows
         if: matrix.target == 'windows'
