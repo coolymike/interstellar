@@ -56,7 +56,7 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux_arm64
             build_target: linux
-            build_path: build/linux/aarch64/release/bundle
+            build_path: build/linux/arm64/release/bundle
     steps:
       - name: Install android dependencies
         if: matrix.target == 'android'
